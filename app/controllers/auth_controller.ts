@@ -1,13 +1,14 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
+import Role from '#models/role'
 import { randomUUID } from 'node:crypto'
 
 export default class AuthController {
-  async redirect({ ally }: HttpContext) {
+  async redirectToGoogle({ ally }: HttpContext) {
     return ally.use('google').redirect()
   }
 
-  async callback({ ally, response }: HttpContext) {
+  async handleGoogleCallback({ ally, response }: HttpContext) {
     const google = ally.use('google')
 
     if (google.accessDenied()) {
@@ -24,6 +25,17 @@ export default class AuthController {
 
     const googleUser = await google.user()
 
+    // Récupérer ou créer le rôle par défaut
+    let defaultRole = await Role.query().where('name', 'user').first()
+    if (!defaultRole) {
+      defaultRole = await Role.create({
+        name: 'user',
+        description: 'Utilisateur standard',
+        permissions: ['reservation.create', 'reservation.read.own'],
+        isActive: true,
+      })
+    }
+
     const user = await User.firstOrCreate(
       { email: googleUser.email },
       {
@@ -32,6 +44,7 @@ export default class AuthController {
         password: crypto.randomUUID(), // générer un mot de passe aléatoire
         email: googleUser.email,
         avatar: googleUser.avatarUrl,
+        roleId: defaultRole.id, // Assigner le rôle par défaut
       }
     )
 
@@ -55,18 +68,38 @@ export default class AuthController {
       fullName: user.fullName,
     })
   }
-  async me({ auth, response }: HttpContext) {
+
+  async getAuthenticatedUser({ auth, response }: HttpContext) {
     await auth.authenticate()
 
     const user = auth.user!
+
+    // Charger les relations pour avoir les infos complètes
+    await user.load('role')
+    await user.load('teams')
 
     return response.ok({
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      avatar: user.avatar,
+      role: user.role
+        ? {
+            id: user.role.id,
+            name: user.role.name,
+            permissions: user.role.permissions,
+          }
+        : null,
+      teams: user.teams.map((team) => ({
+        uuid: team.uuid,
+        name: team.name,
+        color: team.color,
+        roleInTeam: team.$extras.pivot_role_in_team,
+      })),
     })
   }
-  async logout({ auth, response }: HttpContext) {
+
+  async logoutUser({ auth, response }: HttpContext) {
     await auth.authenticate()
 
     const token = auth.user?.currentAccessToken
