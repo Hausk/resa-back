@@ -1,7 +1,7 @@
 import { BaseSchema } from '@adonisjs/lucid/schema'
 
 export default class extends BaseSchema {
-  protected tableName = 'reservations'
+  protected tableName = 'bookings'
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
@@ -10,7 +10,7 @@ export default class extends BaseSchema {
       table.uuid('desk_id').references('desks.id').onDelete('CASCADE').notNullable()
       table.date('date').notNullable()
       table.enum('period', ['morning', 'afternoon', 'full']).notNullable()
-      table.enum('status', ['booked', 'cancelled']).notNullable().defaultTo('booked')
+      table.enum('status', ['pending', 'booked', 'canceled']).notNullable().defaultTo('booked')
       table.timestamp('created_at', { useTz: true }).defaultTo(this.now())
       table.timestamp('updated_at', { useTz: true }).defaultTo(this.now())
 
