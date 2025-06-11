@@ -6,6 +6,7 @@ import Room from './room.js'
 import Feature from './feature.js'
 
 export default class Desk extends BaseModel {
+  static selfAssignPrimaryKey = true
   @column({ isPrimary: true })
   declare id: string
 
